@@ -185,18 +185,18 @@ def get_cocodataset(is_train, is_val, args):
     )
     return ds, num_classes
 
-   
 def get_kittidataset(is_train, is_val, args):
-    rootPath=args.data_path
     #dataset = MyKittiDetection(rootPath, train=True, transform=get_transform(is_train, args))
+    rootPath=args.data_path
     if is_val == True:
         transformfunc=get_transform(False, args)
-        dataset = KittiDataset(rootPath, train=True, split='val', transform=transformfunc)
+        dataset = KittiDataset(rootPath, train=True, split='valid', transform=transformfunc, image_dir='images', labels_dir='labels')
     else:
         transformfunc=get_transform(True, args) #add augumentation
-        dataset = KittiDataset(rootPath, train=is_train, split='train', transform=transformfunc)
+        dataset = KittiDataset(rootPath, train=is_train, split='train', transform=transformfunc, image_dir='images', labels_dir='labels')
     
     num_classes = dataset.numclass
+    
     return dataset, num_classes
     #mykitti = datasets.Kitti(root=rootPath, train= True, transform = get_transform(is_train, args), target_transform = None, download = False)
 
@@ -218,10 +218,11 @@ def get_waymococodataset(is_train, is_val, args):
 
 import yaml
 from DeepDataMiningLearning.detection.dataset_yolo import YOLODataset
+
 def get_yolodataset(is_train, is_val, args):
     rootPath=args.data_path #'/data/cmpe249-fa23/coco/'
     #annotation=args.annotationfile #'/data/cmpe249-fa23/coco/train2017.txt'
-    dataset_cfgfile = './DeepDataMiningLearning/detection/dataset.yaml'
+    dataset_cfgfile = './dataset.yaml'
     with open(dataset_cfgfile, errors='ignore', encoding='utf-8') as f:
         s = f.read()  # string
         data = yaml.safe_load(s) or {}  # always return a dict (yaml.safe_load() may return None for empty files)

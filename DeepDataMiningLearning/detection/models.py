@@ -197,19 +197,27 @@ def create_detectionmodel(modelname, num_classes=None, trainable_layers=0, ckpt_
             print("Model name not supported")
     elif modelname.startswith('yolo'):
         model, preprocess, classes=create_yolomodel(modelname, num_classes, ckpt_file, fp16, device, scale)
-        model= freeze_yolomodel(model, freeze=[])
+        model = freeze_yolomodel(model, freeze=[])
         #ckpt file is already loaded in create_yolomodel
     else:
         print('Model name not supported')
 
     if model:
-        summary(model=model, 
-            input_size=(32, 3, 224, 224), # make sure this is "input_size", not "input_shape"
-            # col_names=["input_size"], # uncomment for smaller output
-            col_names=["input_size", "output_size", "num_params", "trainable"],
-            col_width=20,
-            row_settings=["var_names"]
-        ) 
+        for i, param in enumerate(model.parameters()):
+            if i < 200:
+                param.requires_grad = False
+            else:
+                break
+        try:
+            summary(model=model, 
+                input_size=(32, 3, 224, 224), # make sure this is "input_size", not "input_shape"
+                # col_names=["input_size"], # uncomment for smaller output
+                col_names=["input_size", "output_size", "num_params", "trainable"],
+                col_width=20,
+                row_settings=["var_names"]
+            )
+        except UnicodeEncodeError as e:
+            print("UnicodeEncodeError encountered: ", str(e))
         if device:
             currentdevice=next(model.parameters()).device #simply getting the device name for the first parameter of the nn module
             model=model.to(device)

@@ -66,10 +66,15 @@ class YoloDetectionModel(nn.Module):
         self.inplace = self.yaml.get('inplace', True) #True
 
         #self.model.eval()
+        print("Number of Classes", nc)
+        
 
         # Build strides
         m = self.model[-1]  # Detect()
+        # print("What is self.model[-1]", self.model[-1])
+        print("Model Type", isinstance(m, Detect))
         if isinstance(m, (Detect, Segment, Pose)): 
+            print("In If")
             s = 256  # 2x min stride
             m.inplace = self.inplace
             forward = lambda x: self.forward(x)[0] if isinstance(m, (Segment, Pose)) else self.forward(x)
@@ -77,6 +82,7 @@ class YoloDetectionModel(nn.Module):
             self.stride = m.stride #[ 8., 16., 32.]
             m.bias_init()  # only run once
         elif isinstance(m, IDetect): #added yolov7's IDetect
+            print("In If")
             s = 256  # 2x min stride
             m.stride = torch.tensor([s / x.shape[-2] for x in self.forward(torch.zeros(1, ch, s, s))])  # forward
             m.anchors /= m.stride.view(-1, 1, 1)
@@ -113,155 +119,58 @@ class YoloDetectionModel(nn.Module):
             preds, xtensors = self._predict_once(x) #tensor input #[1, 3, 256, 256]
             #y,x output in inference mode, training mode, direct output x (three items),
             return preds
-    #from base
-    # def forward(self, images, targets=None):
-    #     """
-    #     Forward pass of the model on a single scale.
-    #     Wrapper for `_forward_once` method.
-
-    #     Args:
-    #         x (torch.Tensor | dict): The input image tensor or a dict including image tensor and gt labels.
-
-    #     Returns:
-    #         (torch.Tensor): The output of the network.
-    #     """
-    #     if self.training and targets:
-    #         for target in targets:
-    #             boxes = target["boxes"] #boxes only used for format validation
-    #             if isinstance(boxes, torch.Tensor):
-    #                 torch._assert(
-    #                     len(boxes.shape) == 2 and boxes.shape[-1] == 4,
-    #                     f"Expected target boxes to be a tensor of shape [N, 4], got {boxes.shape}.",
-    #                 )
-    #             else:
-    #                 torch._assert(False, f"Expected target boxes to be of type Tensor, got {type(boxes)}.")
-    #         preds = self._predict_once(images) #tensor input
-    #         #in training mode, direct output x (three items)
-    #         if not hasattr(self, 'criterion'):
-    #             self.criterion = self.init_criterion()
-    #         batch={}
-    #         batch['batch_idx'] = target['image_id'] #int
-    #         batch['cls'] =target['labels'] #tensor int
-    #         batch['bboxes'] = target["boxes"]
-    #         losssum, losses=self.criterion(preds, batch) #losses is three item loss box, cls, dfl
-    #         return losssum
-    #     elif self.training:
-    #         preds = self._predict_once(images) #tensor input
-    #         return preds #training mode, direct output x (three items)
-    #     else: #inference mode
-    #         preds, xtensors = self._predict_once(images) #tensor input #[1, 3, 256, 256]
-    #         #y,x output in inference mode, training mode, direct output x (three items),
-    #         return preds
-
-        # if isinstance(x, dict):  # for cases of training and validating while training.
-        #     return self.loss(x, *args, **kwargs)
-        # return self.predict(x, *args, **kwargs)
-        
-        # if isinstance(images, dict):
-        #     need_loss = True
-        #     if not hasattr(self, 'criterion'):
-        #         self.criterion = self.init_criterion()
-        #     batch={}
-        #     batch['batch_idx']
-        #     batch['cls']
-        #     batch['bboxes']
-        #     losssum, losses=self.criterion(preds, batch) #losses is three item loss box, cls, dfl
-        #     return losssum
-        # elif torch.is_tensor(images): #[1, 3, 256, 256]
-        #     preds = self._predict_once(images) #tensor input
-        #     #y,x output, training mode, direct output x (three items)
-        #     return preds
-        # else:
-        #     print("input format not supported")
-        #     return None
-        # elif isinstance(images, list): #inference mode
-        #     imagelist = True
-        #     original_image_sizes: List[Tuple[int, int]] = []
-        #     for img in images:
-        #         val = img.shape[-2:]
-        #         torch._assert(
-        #             len(val) == 2,
-        #             f"expecting the last two dimensions of the Tensor to be H and W instead got {img.shape[-2:]}",
-        #         )
-        #         original_image_sizes.append((val[0], val[1]))
-        #     images=[self.letterbox(image=x) for x in images] #list of (640, 480, 3)
-        #     if self.detcttransform:
-        #         #imageslist, targets = self.detcttransform(images, targets)
-        #         #images = imageslist.tensors
-        #         images=[self.detcttransform(image=x) for x in images] #letterbox
-        #     images = self.pre_processing(images)
-        #     preds = self._predict_once(images) #tensor input
-        #     #y,x output, training mode, direct output loss x (three items)
-        #     if isinstance(preds, tuple):
-        #         #preds = [self.from_numpy(x) for x in y]
-        #         preds, losstensor = preds
-        #         detections = self.postprocess(preds, images, original_image_sizes)
-        #     return detections, losstensor
 
     
     def _predict_once(self, x, profile=False, visualize=False):
         """
         Perform a forward pass through the network.
-
+    
         Args:
-            x (torch.Tensor): The input tensor to the model.
+            x (torch.Tensor | list): The input tensor to the model or a list of tensors.
             profile (bool):  Print the computation time of each layer if True, defaults to False.
             visualize (bool): Save the feature maps of the model if True, defaults to False.
-
+    
         Returns:
             (torch.Tensor): The last output of the model.
         """
-        #y, dt = [], []  # outputs, dt used in profile
         y = []
         for m in self.model:
             if m.f != -1:  # if not from previous layer
-                x = y[m.f] if isinstance(m.f, int) else [x if j == -1 else y[j] for j in m.f]  # from earlier layers
-            # if profile:
-            #     self._profile_one_layer(m, x, dt)
+                if isinstance(m.f, int):
+                    x = y[m.f]
+                else:  # m.f is presumably a list of indices
+                    x = [x if j == -1 else y[j] for j in m.f]
+                    if all(isinstance(xi, torch.Tensor) for xi in x):
+                        # Assuming that the layer expects a concatenated tensor of inputs
+                        x = torch.cat(x, dim=1)
+                        print(x.shape)
+                        # x = torch.cat([x, x], dim=1)
+                    else:
+                        raise TypeError("List elements are not all torch.Tensor as expected.")
+            
+            # Debugging information to track input shapes and types
+            if isinstance(x, torch.Tensor):
+                print(f"Layer {m.__class__.__name__}: Input is a Tensor with shape {x.shape}")
+            elif isinstance(x, list):
+                print(f"Layer {m.__class__.__name__}: Input is a list with length {len(x)}")
+            else:
+                print(f"Layer {m.__class__.__name__}: Input has an unexpected type {type(x)}")
+            
             
             x = m(x)  # run
-
-            y.append(x if m.i in self.save else None)  # save output
-            # if visualize:
-            #     feature_visualization(x, m.type, m.i, save_dir=visualize)
+    
+            # Additional debug information after processing the layer
+            if isinstance(x, torch.Tensor):
+                print(f"After processing, output is a Tensor with shape {x.shape}")
+            else:
+                print(f"After processing, output has type {type(x)}")
+    
+            y.append(x if m.i in self.save else None)  # save output if necessary
+    
+            # Visualization code could go here, if visualize is True
+    
         return x
         
-    # def _predict_augment(self, x):
-    #     """Perform augmentations on input image x and return augmented inference and train outputs."""
-    #     img_size = x.shape[-2:]  # height, width
-    #     s = [1, 0.83, 0.67]  # scales
-    #     f = [None, 3, None]  # flips (2-ud, 3-lr)
-    #     y = []  # outputs
-    #     for si, fi in zip(s, f):
-    #         xi = scale_img(x.flip(fi) if fi else x, si, gs=int(self.stride.max()))
-    #         yi = super().predict(xi)[0]  # forward
-    #         yi = self._descale_pred(yi, fi, si, img_size)
-    #         y.append(yi)
-    #     y = self._clip_augmented(y)  # clip augmented tails
-    #     return torch.cat(y, -1), None  # augmented inference, train
-
-    # @staticmethod
-    # def _descale_pred(p, flips, scale, img_size, dim=1):
-    #     """De-scale predictions following augmented inference (inverse operation)."""
-    #     p[:, :4] /= scale  # de-scale
-    #     x, y, wh, cls = p.split((1, 1, 2, p.shape[dim] - 4), dim)
-    #     if flips == 2:
-    #         y = img_size[0] - y  # de-flip ud
-    #     elif flips == 3:
-    #         x = img_size[1] - x  # de-flip lr
-    #     return torch.cat((x, y, wh, cls), dim)
-
-    # def _clip_augmented(self, y):
-    #     """Clip YOLOv5 augmented inference tails."""
-    #     nl = self.model[-1].nl  # number of detection layers (P3-P5)
-    #     g = sum(4 ** x for x in range(nl))  # grid points
-    #     e = 1  # exclude layer count
-    #     i = (y[0].shape[-1] // g) * sum(4 ** x for x in range(e))  # indices
-    #     y[0] = y[0][..., :-i]  # large
-    #     i = (y[-1].shape[-1] // g) * sum(4 ** (nl - 1 - x) for x in range(e))  # indices
-    #     y[-1] = y[-1][..., i:]  # small
-    #     return y
-
     def init_criterion(self):
         if "v8" in self.modelname:
             return myv8DetectionLoss(self) #v8DetectionLoss(self)
@@ -479,11 +388,10 @@ from torchvision.transforms.functional import to_pil_image
 import torchvision
 
 def create_yolomodel(modelname, num_classes = None, ckpt_file = None, fp16 = False, device = 'cuda:0', scale='n'):
-    
-    modelcfg_file=os.path.join('./DeepDataMiningLearning/detection/modules', modelname+'.yaml')
-    cfgPath='./DeepDataMiningLearning/detection/modules/default.yaml'
+    modelcfg_file=os.path.join('./modules', modelname+'.yaml')
+    cfgPath='./modules/default.yaml'
     myyolo = None
-    preprocess =None
+    preprocess = None
     classesList = None
     if os.path.exists(modelcfg_file) and os.path.exists(cfgPath):
         DEFAULT_CFG_DICT = load_defaultcfgs(cfgPath)
@@ -511,6 +419,9 @@ def freeze_yolomodel(model, freeze=[]):
         freeze, list) else range(freeze) if isinstance(freeze, int) else []
     always_freeze_names = ['.dfl']  # always freeze these layers
     freeze_layer_names = [f'model.{x}.' for x in freeze_list] + always_freeze_names
+    
+    print("This is the model", model)
+    
     for k, v in model.named_parameters():
         # v.register_hook(lambda x: torch.nan_to_num(x))  # NaN to 0 (commented for erratic training results)
         if any(x in k for x in freeze_layer_names):
@@ -523,20 +434,22 @@ def freeze_yolomodel(model, freeze=[]):
     return model
 
 def test_yolov7weights():
-    myyolov7=YoloDetectionModel(cfg='./DeepDataMiningLearning/detection/modules/yolov7.yaml', ch=3) #nc =80
-    print(myyolov7)
+    myyolov7=YoloDetectionModel(cfg='./yolov7.yaml', ch=3) #nc =80
+    # print(myyolov7)
     img = torch.rand(1, 3, 640, 640)
     myyolov7.eval()
     preds = myyolov7(img)
+    # print(preds)
     #y,x = myyolov7(img)#tuple output, first item is tensor [1, 25200, 85], second item is list of three, [1, 3, 80, 80, 85], [1, 3, 40, 40, 85], [1, 3, 20, 20, 85]
     #print(y.shape) #[1, 25200, 85]
     #print(len(x)) #3
     #print(x[0].shape) #[1, 3, 80, 80, 85]
-
-    ckpt_file = '/data/cmpe249-fa23/modelzoo/yolov7_statedicts.pt'
+    # print("import error 1")
+    ckpt_file = './models_yolo/yolov7_training.pt'
     #ModuleNotFoundError: No module named 'models'
-    ckpt=torch.load(ckpt_file, map_location='cpu')
-    print(ckpt.keys()) #'0.conv.weight', '0.bn.weight', '0.bn.bias'
+    ckpt=torch.load(ckpt_file, map_location='cpu', weights_only=True)
+    # print(ckpt.keys()) #'0.conv.weight', '0.bn.weight', '0.bn.bias'
+    # print("import error")
     newckpt = {}
     for key in ckpt.keys():
         newkey='model.'+key
@@ -551,13 +464,13 @@ def test_yolov7weights():
 if __name__ == "__main__":
     test_yolov7weights()
 
-    cfgPath='./DeepDataMiningLearning/detection/modules/default.yaml'
+    cfgPath='./modules/default.yaml'
     DEFAULT_CFG_DICT = load_defaultcfgs(cfgPath)
     images=[]
     images.append(torch.rand(3, 640, 480))
 
     print(os.getcwd())
-    modelcfg_file='./DeepDataMiningLearning/detection/modules/yolov8.yaml'
+    modelcfg_file='./modules/yolov8.yaml'
     imagepath='./sampledata/bus.jpg'
     #im=preprocess_img(imagepath, opencvread=True) #[1, 3, 640, 480]
     myyolo=YoloDetectionModel(cfg=modelcfg_file, scale='n', ch=3) #nc =80

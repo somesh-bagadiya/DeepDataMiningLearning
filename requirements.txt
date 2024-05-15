@@ -2,3 +2,12 @@ myst-parser
 sphinx-rtd-theme
 nbsphinx
 nbsphinx_link
+opencv-python
+psutil
+tqdm
+pandas
+scipy
+torch
+torchvision
+pycocotools
+setuptools

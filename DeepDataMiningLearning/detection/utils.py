@@ -6,6 +6,8 @@ from collections import defaultdict, deque
 import torchvision
 import torch
 import torch.distributed as dist
+import logging
+logging.basicConfig(level=logging.DEBUG)
 
 def _get_iou_types(model):
     model_without_ddp = model
@@ -137,6 +139,7 @@ class MetricLogger:
         for k, v in kwargs.items():
             if isinstance(v, torch.Tensor):
                 v = v.item()
+            logging.debug(f"Checking data with value: {v}")
             assert isinstance(v, (float, int))
             self.meters[k].update(v)
 
@@ -222,9 +225,11 @@ def collate_fn(batch):
     return tuple(zip(*batch))
 
 #from ultralytics\data\dataset.py
-@staticmethod
+# @staticmethod
 def mycollate_fn(batch): #16 imagefile list, each item is a dict
     """Collates data samples into batches."""
+    print(type(batch[0]), type(batch[1]), type(batch[2]))
+    print(batch)
     #test=tuple(zip(*batch))
     new_batch = {}
     keys = batch[0].keys()

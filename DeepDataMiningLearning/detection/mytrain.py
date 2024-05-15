@@ -44,7 +44,7 @@ def get_args_parser(add_help=True):
 
     parser = argparse.ArgumentParser(description="PyTorch Detection Training", add_help=add_help)
 
-    parser.add_argument("--data-path", default="/data/cmpe249-fa23/WaymoCOCO/", type=str, help="dataset path") #"/data/cmpe249-fa23/WaymoCOCO/"
+    parser.add_argument("--data-path", default="./data/", type=str, help="dataset path") #"/data/cmpe249-fa23/WaymoCOCO/"
     parser.add_argument("--annotationfile", default="", type=str, help="dataset annotion file path, e.g., coco json file") #annotations_train200new.json
     parser.add_argument(
         "--dataset",
@@ -52,23 +52,23 @@ def get_args_parser(add_help=True):
         type=str,
         help="dataset name. Use coco for object detection and instance segmentation and coco_kp for Keypoint detection",
     )
-    parser.add_argument("--model", default="customrcnn_resnet152", type=str, help="model name") #customrcnn_resnet152, fasterrcnn_resnet50_fpn_v2
-    parser.add_argument("--trainable", default=0, type=int, help="number of trainable layers (sequence) of backbone")
+    parser.add_argument("--model", default="fasterrcnn_resnet50_fpn_v2", type=str, help="model name") #customrcnn_resnet152, fasterrcnn_resnet50_fpn_v2
+    parser.add_argument("--trainable", default=10, type=int, help="number of trainable layers (sequence) of backbone")
     parser.add_argument("--device", default="cuda", type=str, help="device (Use cuda or cpu Default: cuda)")
     parser.add_argument(
-        "-b", "--batch-size", default=16, type=int, help="images per gpu, the total batch size is $NGPU x batch_size"
+        "-b", "--batch-size", default=4, type=int, help="images per gpu, the total batch size is $NGPU x batch_size"
     )
-    parser.add_argument("--epochs", default=60, type=int, metavar="N", help="number of total epochs to run")
-    parser.add_argument("--saveeveryepoch", default=4, type=int, metavar="N", help="number of epochs to save")
+    parser.add_argument("--epochs", default=20, type=int, metavar="N", help="number of total epochs to run")
+    parser.add_argument("--saveeveryepoch", default=5, type=int, metavar="N", help="number of epochs to save")
     parser.add_argument(
         "-j", "--workers", default=4, type=int, metavar="N", help="number of data loading workers (default: 4)"
     )
-    parser.add_argument("--opt", default="sgd", type=str, help="optimizer")
+    parser.add_argument("--opt", default="adamw", type=str, help="optimizer")
     parser.add_argument(
         "--lr",
         default=0.02,
         type=float,
-        help="initial learning rate, 0.02 is the default value for training on 8 gpus and 2 images_per_gpu",
+        help="initial learning rate, 0.01 is the default value for training on 8 gpus and 2 images_per_gpu",
     )
     parser.add_argument("--momentum", default=0.9, type=float, metavar="M", help="momentum")
     parser.add_argument(
@@ -103,7 +103,7 @@ def get_args_parser(add_help=True):
         "--lr-gamma", default=0.1, type=float, help="decrease lr by a factor of lr-gamma (multisteplr scheduler only)"
     )
     parser.add_argument("--print-freq", default=5, type=int, help="print frequency")
-    parser.add_argument("--output-dir", default="/data/cmpe249-fa23/trainoutput", type=str, help="path to save outputs")
+    parser.add_argument("--output-dir", default="./Results/", type=str, help="path to save outputs")
     parser.add_argument("--resume", default="", type=str, help="path of checkpoint") #/data/cmpe249-fa23/trainoutput/kitti/model_4.pth
     parser.add_argument("--start_epoch", default=0, type=int, help="start epoch")
     parser.add_argument("--aspect-ratio-group-factor", default=-1, type=int) #3

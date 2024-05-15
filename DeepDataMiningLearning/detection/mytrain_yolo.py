@@ -11,7 +11,7 @@ import torchvision.models.detection
 from DeepDataMiningLearning.detection import utils
 from DeepDataMiningLearning.detection.trainutils import create_aspect_ratio_groups, GroupedBatchSampler
 
-from DeepDataMiningLearning.detection.dataset import get_dataset #get_cocodataset, get_kittidataset, get_transform
+from DeepDataMiningLearning.detection.dataset import get_kittidataset #get_dataset, get_cocodataset, get_kittidataset, get_transform
 from DeepDataMiningLearning.detection.models import create_detectionmodel #get_torchvision_detection_models, modify_fasterrcnnheader
 from DeepDataMiningLearning.detection.myevaluator import simplemodelevaluate, modelevaluate, yoloevaluate
 
@@ -24,8 +24,8 @@ except:
 #Select the visible GPU
 #os.environ['CUDA_VISIBLE_DEVICES'] = "1,2,3" #"0,1"
 
-MACHINENAME='HPC'
-USE_AMP=True #AUTOMATIC MIXED PRECISION
+# MACHINENAME='HPC'
+# USE_AMP=True #AUTOMATIC MIXED PRECISION
 # if MACHINENAME=='HPC':
 #     os.environ['TORCH_HOME'] = '/data/cmpe249-fa23/torchhome/'
 #     DATAPATH='/data/cmpe249-fa23/torchvisiondata/'
@@ -44,26 +44,26 @@ def get_args_parser(add_help=True):
 
     parser = argparse.ArgumentParser(description="PyTorch Detection Training", add_help=add_help)
 
-    parser.add_argument("--data-path", default="/data/cmpe249-fa23/waymotrain200cocoyolo/", type=str, help="dataset path") #/data/cmpe249-fa23/waymotrain200cocoyolo/, /data/cmpe249-fa23/coco/
+    parser.add_argument("--data-path", default="./Datasets/", type=str, help="dataset path") #/data/cmpe249-fa23/waymotrain200cocoyolo/, /data/cmpe249-fa23/coco/
     parser.add_argument("--annotationfile", default="", type=str, help="dataset annotion file path, e.g., coco json file")
     parser.add_argument(
         "--dataset",
-        default="yolo", 
+        default="kitti", 
         type=str,
         help="dataset name. Use coco for object detection and instance segmentation and coco_kp for Keypoint detection",
     )
     parser.add_argument("--model", default="yolov8", type=str, help="model name") #customrcnn_resnet152, fasterrcnn_resnet50_fpn_v2
     parser.add_argument("--scale", default="x", type=str, help="model scale: n, x") 
-    parser.add_argument("--ckpt", default="/data/cmpe249-fa23/modelzoo/yolov8x_statedicts.pt", type=str, help="model name") #"/data/cmpe249-fa23/modelzoo/yolov8n_statedicts.pt"
+    parser.add_argument("--ckpt", default="./modules/models_yolo/yolov8s.pt", type=str, help="model name") #"/data/cmpe249-fa23/modelzoo/yolov8n_statedicts.pt"
     parser.add_argument("--trainable", default=0, type=int, help="number of trainable layers (sequence) of backbone")
-    parser.add_argument("--device", default="cuda:3", type=str, help="device (Use cuda or cpu Default: cuda)")
+    parser.add_argument("--device", default="cuda:0", type=str, help="device (Use cuda or cpu Default: cuda)")
     parser.add_argument(
-        "-b", "--batch-size", default=16, type=int, help="images per gpu, the total batch size is $NGPU x batch_size"
+        "-b", "--batch-size", default=4, type=int, help="images per gpu, the total batch size is $NGPU x batch_size"
     )
-    parser.add_argument("--epochs", default=30, type=int, metavar="N", help="number of total epochs to run")
+    parser.add_argument("--epochs", default=10, type=int, metavar="N", help="number of total epochs to run")
     parser.add_argument("--saveeveryepoch", default=1, type=int, metavar="N", help="number of epochs to save")
     parser.add_argument(
-        "-j", "--workers", default=4, type=int, metavar="N", help="number of data loading workers (default: 4)"
+        "-j", "--workers", default=0, type=int, metavar="N", help="number of data loading workers (default: 4)"
     )
     parser.add_argument("--opt", default="sgd", type=str, help="optimizer")
     parser.add_argument(
@@ -105,8 +105,8 @@ def get_args_parser(add_help=True):
         "--lr-gamma", default=0.1, type=float, help="decrease lr by a factor of lr-gamma (multisteplr scheduler only)"
     )
     parser.add_argument("--print-freq", default=50, type=int, help="print frequency")
-    parser.add_argument("--output-dir", default="/data/cmpe249-fa23/trainoutput", type=str, help="path to save outputs")
-    parser.add_argument("--resume", default="/data/cmpe249-fa23/trainoutput/yolo/yolov8x0319/model_30.pth", type=str, help="path of checkpoint") #/data/cmpe249-fa23/trainoutput/yolo/yolov8x0318/model_25.pth
+    parser.add_argument("--output-dir", default="./Results", type=str, help="path to save outputs")
+    parser.add_argument("--resume", default="", type=str, help="path of checkpoint") #/data/cmpe249-fa23/trainoutput/yolo/yolov8x0318/model_25.pth
     parser.add_argument("--start_epoch", default=0, type=int, help="start epoch")
     parser.add_argument("--aspect-ratio-group-factor", default=-1, type=int) #3
     parser.add_argument("--rpn-score-thresh", default=None, type=float, help="rpn score threshold for faster-rcnn")
@@ -134,8 +134,8 @@ def get_args_parser(add_help=True):
 
     # distributed training parameters
     parser.add_argument("--multigpu", default=False, type=bool, help="disable torch ddp")
-    parser.add_argument("--world-size", default=4, type=int, help="number of distributed processes")
-    parser.add_argument("--dist-url", default="env://", type=str, help="url used to set up distributed training")
+    parser.add_argument("--world-size", default=1, type=int, help="number of distributed processes")
+    parser.add_argument("--dist-url", default="", type=str, help="url used to set up distributed training")
     parser.add_argument("--weights", default=None, type=str, help="the weights enum name to load")
     parser.add_argument("--weights-backbone", default=None, type=str, help="the backbone weights enum name to load")
 
@@ -170,7 +170,6 @@ def main(args):
         args.distributed = True
     else:
         args.distributed = False
-    print(args)
 
     device = torch.device(args.device)
 
@@ -180,8 +179,11 @@ def main(args):
     # Data loading code
     print("Loading data")
 
-    dataset, num_classes = get_dataset(args.dataset, is_train=True, is_val=False, args=args) #get_dataset
-    dataset_test, _ = get_dataset(args.dataset, is_train=False, is_val=True, args=args)
+    # dataset, num_classes = get_dataset(args.dataset, is_train=True, is_val=False, args=args) #get_dataset
+    # dataset_test, _ = get_dataset(args.dataset, is_train=False, is_val=True, args=args)
+
+    dataset, num_classes = get_kittidataset(is_train=True, is_val=False, args=args) #get_dataset
+    dataset_test, _ = get_kittidataset(is_train=False, is_val=True, args=args)
 
     # split the dataset in train and test set
     # indices = torch.randperm(len(dataset)).tolist()
@@ -206,13 +208,14 @@ def main(args):
     else:
         train_batch_sampler = torch.utils.data.BatchSampler(train_sampler, args.batch_size, drop_last=True)
 
-    new_collate_fn = utils.mycollate_fn #utils.collate_fn
+    # new_collate_fn = utils.mycollate_fn #utils.collate_fn
+    new_collate_fn = utils.collate_fn
     data_loader = torch.utils.data.DataLoader(
         dataset, batch_sampler=train_batch_sampler, num_workers=args.workers, collate_fn=new_collate_fn
     )
 
     data_loader_test = torch.utils.data.DataLoader(
-        dataset_test, batch_size=1, sampler=test_sampler, num_workers=1, collate_fn=new_collate_fn
+        dataset_test, batch_size=1, sampler=test_sampler, num_workers=0, collate_fn=new_collate_fn
     )
 
     print("Creating model")
@@ -314,6 +317,62 @@ def main(args):
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
     print(f"Training time {total_time_str}")
 
+# def train_one_epoch(model, optimizer, data_loader, device, preprocess, epoch, print_freq, scaler=None):
+#     model.train()
+#     metric_logger = utils.MetricLogger(delimiter="  ")
+#     metric_logger.add_meter("lr", utils.SmoothedValue(window_size=1, fmt="{value:.6f}"))
+#     header = f"Epoch: [{epoch}]"
+    
+#     lr_scheduler = None
+#     if epoch == 0:
+#         warmup_factor = 1.0 / 1000
+#         warmup_iters = min(1000, len(data_loader) - 1)
+    
+#         lr_scheduler = torch.optim.lr_scheduler.LinearLR(
+#             optimizer, start_factor=warmup_factor, total_iters=warmup_iters
+#         )
+    
+#     # Begin processing batches
+#     for images, targets in metric_logger.log_every(data_loader, print_freq, header):
+#         # print(images, targets)  # Optional: to see what's being processed
+#         images = preprocess(images)  # Preprocess images; assume preprocess function modifies images in-place or returns new images
+#         targets = [{k: v.to(device) for k, v in t.items()} if isinstance(t, dict) else t for t in targets]  # Ensure targets are correctly moved to device
+    
+#         with torch.cuda.amp.autocast(enabled=scaler is not None):
+#             loss, loss_items = model(images, targets)  # Assuming your model returns a total loss and individual loss components
+#             loss_dict = {
+#                 'box': loss_items[0],
+#                 'cls': loss_items[1],
+#                 'dfl': loss_items[2]
+#             }
+    
+#         # Reduce losses over all GPUs for logging purposes
+#         loss_dict_reduced = utils.reduce_dict(loss_dict)
+#         losses_reduced = sum(loss for loss in loss_dict_reduced.values())
+    
+#         loss_value = losses_reduced.item()
+#         if not math.isfinite(loss_value):
+#             print(f"Loss is {loss_value}, stopping training")
+#             print(loss_dict_reduced)
+#             sys.exit(1)
+    
+#         optimizer.zero_grad()
+#         if scaler is not None:
+#             scaler.scale(losses_reduced).backward()
+#             scaler.step(optimizer)
+#             scaler.update()
+#         else:
+#             losses_reduced.backward()
+#             optimizer.step()
+    
+#         if lr_scheduler is not None:
+#             lr_scheduler.step()
+    
+#         metric_logger.update(loss=losses_reduced, **loss_dict_reduced)
+#         metric_logger.update(lr=optimizer.param_groups[0]["lr"])
+    
+#     return metric_logger
+
 def train_one_epoch(model, optimizer, data_loader, device, preprocess, epoch, print_freq, scaler=None):
     model.train()
     metric_logger = utils.MetricLogger(delimiter="  ")
@@ -324,33 +383,40 @@ def train_one_epoch(model, optimizer, data_loader, device, preprocess, epoch, pr
     if epoch == 0:
         warmup_factor = 1.0 / 1000
         warmup_iters = min(1000, len(data_loader) - 1)
-
         lr_scheduler = torch.optim.lr_scheduler.LinearLR(
             optimizer, start_factor=warmup_factor, total_iters=warmup_iters
         )
 
-    #images, targets
-    for batch in metric_logger.log_every(data_loader, print_freq, header):
-        batch['img']=preprocess(batch['img']) #batch['img'] = batch['img'].to(device)
-        #img is already a tensor, preprocess function only do device
+    # Begin processing batches
+    for images, targets in metric_logger.log_every(data_loader, print_freq, header):
+        images = preprocess(images)  # preprocess the images
+        if images.dim() == 3:  # Check if the image tensor is 3D
+            images = images.unsqueeze(0)  # Add a batch dimension
 
-        #images = list(image.to(device) for image in images) #list of [3, 1280, 1920]
-        #targets = [{k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in t.items()} for t in targets] #tuple to list
+        # Properly handle each element in targets
+        new_targets = []
+        for t in targets:
+            if isinstance(t, dict):
+                # Only convert tensors to device
+                new_targets.append({k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in t.items()})
+            else:
+                # Add non-dictionary items directly
+                new_targets.append(t)
+        targets = new_targets  # Replace the old targets list with the new one
+        
+        print(images.shape, targets)
         with torch.cuda.amp.autocast(enabled=scaler is not None):
-            #loss_dict = model(images, targets) #dict with 4 keys
-            loss, loss_items = model(batch)
-            losses = loss #sum(loss for loss in loss_dict.values()) #single value
-            loss_dict={}
-            loss_dict['box']=loss_items[0]
-            loss_dict['cls']=loss_items[1]
-            loss_dict['dfl']=loss_items[2]
+            loss, loss_items = model(images, targets)  # Model computation
+            loss_dict = {
+                'box': loss_items[0],
+                'cls': loss_items[1],
+                'dfl': loss_items[2]
+            }
 
-        # reduce losses over all GPUs for logging purposes
         loss_dict_reduced = utils.reduce_dict(loss_dict)
         losses_reduced = sum(loss for loss in loss_dict_reduced.values())
 
         loss_value = losses_reduced.item()
-
         if not math.isfinite(loss_value):
             print(f"Loss is {loss_value}, stopping training")
             print(loss_dict_reduced)
@@ -358,11 +424,11 @@ def train_one_epoch(model, optimizer, data_loader, device, preprocess, epoch, pr
 
         optimizer.zero_grad()
         if scaler is not None:
-            scaler.scale(losses).backward()
+            scaler.scale(losses_reduced).backward()
             scaler.step(optimizer)
             scaler.update()
         else:
-            losses.backward()
+            losses_reduced.backward()
             optimizer.step()
 
         if lr_scheduler is not None:
@@ -372,6 +438,8 @@ def train_one_epoch(model, optimizer, data_loader, device, preprocess, epoch, pr
         metric_logger.update(lr=optimizer.param_groups[0]["lr"])
 
     return metric_logger
+
+
 
 if __name__ == "__main__":
     args = get_args_parser().parse_args()

@@ -146,33 +146,63 @@ class YoloTransform(nn.Module):
         self.nms_max_det = cfgs['max_det'] if cfgs['max_det'] else 300
         self.classes = cfgs['classes']
     
+    # def forward(self, images, targets=None):
+    #     #cv2 image list [(1080, 810, 3)]
+    #     if isinstance(images, list): #inference mode
+    #         # for img in images:
+    #         #     val = img.shape[0:2]#img.shape[-2:]
+    #         #     torch._assert(
+    #         #         len(val) == 2,
+    #         #         f"expecting the last two dimensions of the Tensor to be H and W instead got {img.shape[-2:]}",
+    #         #     )
+    #         #     self.original_image_sizes.append((val[0], val[1]))
+    #         images=[self.letterbox(image=x) for x in images] #list of (640, 480, 3)
+    #         #if self.detcttransform:
+    #             #imageslist, targets = self.detcttransform(images, targets)
+    #             #images = imageslist.tensors
+    #             #images=[self.detcttransform(image=x) for x in images] #letterbox
+    #         #self.newimage_size = images[0].shape[0:2] #(640, 480, 3)
+    #         images = self.pre_processing(images)
+    #         return images #tensor output
+    #     elif isinstance(images, torch.Tensor):
+    #         images = self.pre_processing(images)
+    #         return images
+    #     else: #single image input, numpy array
+    #         print(type(images), images)
+    #         val = images.shape[-2:] #HWC to CHW format
+    #         #self.original_image_sizes.append((val[0], val[1]))
+    #         images=[self.letterbox(image=images)]
+    #         images = self.pre_processing(images)
+    #         return images #tensor output BCHW
+    
     def forward(self, images, targets=None):
-        #cv2 image list [(1080, 810, 3)]
-        if isinstance(images, list): #inference mode
-            # for img in images:
-            #     val = img.shape[0:2]#img.shape[-2:]
-            #     torch._assert(
-            #         len(val) == 2,
-            #         f"expecting the last two dimensions of the Tensor to be H and W instead got {img.shape[-2:]}",
-            #     )
-            #     self.original_image_sizes.append((val[0], val[1]))
-            images=[self.letterbox(image=x) for x in images] #list of (640, 480, 3)
-            #if self.detcttransform:
-                #imageslist, targets = self.detcttransform(images, targets)
-                #images = imageslist.tensors
-                #images=[self.detcttransform(image=x) for x in images] #letterbox
-            #self.newimage_size = images[0].shape[0:2] #(640, 480, 3)
-            images = self.pre_processing(images)
-            return images #tensor output
+        # Handle tuples that might contain more than one tensor (adjust as needed)
+        if isinstance(images, tuple):
+            # Assuming the first element is always the image tensor
+            images = images[0]  # Use only the first tensor assuming it's the images
+        
+        # Now `images` should be a tensor or a list of images (numpy arrays)
+        if isinstance(images, list):  # inference mode
+            images = [self.letterbox(image=x) for x in images]  # apply letterbox to each image in the list
+            images = self.pre_processing(images)  # apply preprocessing to the list of images
+            return images  # should return a tensor output
+    
         elif isinstance(images, torch.Tensor):
+            # If images is a single tensor, directly preprocess it
             images = self.pre_processing(images)
             return images
-        else: #single image input, numpy array
-            val = images.shape[-2:] #HWC to CHW format
-            #self.original_image_sizes.append((val[0], val[1]))
-            images=[self.letterbox(image=images)]
-            images = self.pre_processing(images)
-            return images #tensor output BCHW
+    
+        else:  # Single image input, which should be a numpy array
+            print("Received single image input:", type(images))
+            if hasattr(images, 'shape'):
+                val = images.shape[-2:]  # Extract dimensions for logging or checks
+                images = [self.letterbox(image=images)]  # Convert to list for letterbox
+                images = self.pre_processing(images)
+                return images  # Return tensor output in BCHW format
+            else:
+                raise TypeError(f"Unsupported type for images: {type(images)}. Expected list, tuple, or torch.Tensor.")
+
+
     
     def pre_processing(self, im):
         """Prepares input image before inference.

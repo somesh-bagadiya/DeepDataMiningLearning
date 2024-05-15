@@ -18,23 +18,25 @@ class KittiDataset(torch.utils.data.Dataset):
                  train: bool = True,
                  split: str = 'train', #'val' 'test'
                  transform: Optional[Callable] = None,
-                 image_dir: str = "image_2", 
-                 labels_dir: str = "label_2"):
+                 image_dir: str = "images", 
+                 labels_dir: str = "labels"):
         self.images = []
         self.targets = []
         self.root = root
         self.train = train
         self.transform = transform
-        self._location = "training" if self.train else "testing"
+        self._location = "train" if self.train else "test"
         self.image_dir_name = image_dir
         self.labels_dir_name = labels_dir
+        
         # load all image files, sorting them to
         # ensure that they are aligned
         self.split = split
-        split_dir = Path(self.root) / 'ImageSets' / (self.split + '.txt') #select kitti/ImageSets/val.txt
+        split_dir = Path(self.root) / self.split / (self.split + '.txt') #select kitti/ImageSets/val.txt
+        # print("Split Directory", split_dir)
         #sample_id_list: str list
         self.sample_id_list = [x.strip() for x in open(split_dir).readlines()] if split_dir.exists() else None
-        self.root_split_path = os.path.join(self.root, "raw", self._location)
+        self.root_split_path = os.path.join(self.root, self._location)
         
         # image_dir = os.path.join(self.root, "raw", self._location, self.image_dir_name)
         # if self.train:
@@ -51,13 +53,13 @@ class KittiDataset(torch.utils.data.Dataset):
 
     def get_image(self, idx):
         img_file = Path(self.root_split_path) / self.image_dir_name / ('%s.png' % idx)
-        assert img_file.exists()
+        img_file.exists()
         image = Image.open(img_file)
         return image
     
     def get_label(self, idx):
         label_file = Path(self.root_split_path) / self.labels_dir_name / ('%s.txt' % idx)
-        assert label_file.exists()
+        label_file.exists()
         target = []
         with open(label_file) as inp:
             content = csv.reader(inp, delimiter=" ")
@@ -226,6 +228,8 @@ class KittiDataset(torch.utils.data.Dataset):
         return newtarget, imageidx
 
     def __len__(self) -> int:
+        # print('YOU CALLED LEN')
+        # print(self.sample_id_list)
         return len(self.sample_id_list)#(self.images)
 
 class MyKittiDetection(torch.utils.data.Dataset):
@@ -233,25 +237,29 @@ class MyKittiDetection(torch.utils.data.Dataset):
                  root: str,
                  train: bool = True,
                  transform: Optional[Callable] = None,
-                 image_dir: str = "image_2", 
-                 labels_dir: str = "label_2"):
+                 image_dir: str = "images", 
+                 labels_dir: str = "labels"):
         self.images = []
         self.targets = []
         self.root = root
         self.train = train
         self.transform = transform
-        self._location = "training" if self.train else "testing"
+        self._location = "train" if self.train else "test"
         self.image_dir_name = image_dir
         self.labels_dir_name = labels_dir
         # load all image files, sorting them to
         # ensure that they are aligned
-        image_dir = os.path.join(self.root, "raw", self._location, self.image_dir_name)
+
+        image_dir = os.path.join(self.root, self._location, self.image_dir_name + '\\')
+        
         if self.train:
-            labels_dir = os.path.join(self.root, "raw", self._location, self.labels_dir_name)
+            labels_dir = os.path.join(self.root, self._location, self.labels_dir_name + '\\')
+        
         for img_file in os.listdir(image_dir):
             self.images.append(os.path.join(image_dir, img_file))
             if self.train:
                 self.targets.append(os.path.join(labels_dir, f"{img_file.split('.')[0]}.txt"))
+                
         #self.imgs = list(sorted(os.listdir(os.path.join(self.root, "PNGImages"))))
         self.INSTANCE_CATEGORY_NAMES = ['Car', 'Van', 'Truck', 'Pedestrian', 'Person_sitting', 'Cyclist', 'Tram', 'Misc', 'DontCare']
         self.INSTANCE2id = {'Car': 1, 'Van': 2, 'Truck': 3, 'Pedestrian':4, 'Person_sitting':5, 'Cyclist':6, 'Tram':7, 'Misc':8, 'DontCare':9} #background is 0
@@ -387,7 +395,7 @@ if __name__ == "__main__":
         weights = ''
         test_only = False
     
-    rootPath = '/data/cmpe249-fa23/torchvisiondata/Kitti'
+    rootPath = '.\\Datasets'
     is_train = True
     kittidataset = MyKittiDetection(rootPath, train=True, transform=get_transformsimple(is_train))
     print(kittidataset.INSTANCE_CATEGORY_NAMES)
